@@ -7,6 +7,9 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.util.Log;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
 
 import com.bretdeasy.sliderocker.R;
@@ -23,6 +26,7 @@ public class SlideRocker extends View {
     private int mLineColor;
     private int mIndicatorColor;
     private RectF mIndicatorRect;
+    private RectF mIndicatorOriginRect;
     private RectF mTopCapRect;
     private RectF mBottomCapRect;
 
@@ -30,6 +34,11 @@ public class SlideRocker extends View {
     private int mWidth;
     private int mHeight;
     private int mCapRadius;
+
+    //Gesture
+    private GestureDetector mDetector;
+    private boolean isScrolling;
+
 
     public SlideRocker(Context context) {
         super(context);
@@ -64,6 +73,8 @@ public class SlideRocker extends View {
         mIndicatorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mIndicatorPaint.setColor(mIndicatorColor);
         mLinePaint.setStyle(Paint.Style.FILL);
+
+        mDetector = new GestureDetector(SlideRocker.this.getContext(), new GestureListener());
     }
 
     @Override
@@ -80,6 +91,12 @@ public class SlideRocker extends View {
         int indicatorRadius = mWidth / 2;
 
         mIndicatorRect = new RectF(
+                centerX - indicatorRadius,
+                centerY - indicatorRadius,
+                centerX + indicatorRadius,
+                centerY + indicatorRadius);
+
+        mIndicatorOriginRect = new RectF(
                 centerX - indicatorRadius,
                 centerY - indicatorRadius,
                 centerX + indicatorRadius,
@@ -108,5 +125,44 @@ public class SlideRocker extends View {
         canvas.drawOval(mTopCapRect, mLinePaint);
         canvas.drawOval(mBottomCapRect, mLinePaint);
         canvas.drawOval(mIndicatorRect, mIndicatorPaint);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        boolean result = mDetector.onTouchEvent(event);
+
+        if (!result) {
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                resetView();
+            }
+        }
+
+        return result;
+    }
+
+    private void resetView() {
+        isScrolling = false;
+        mIndicatorRect.set(mIndicatorOriginRect);
+
+        invalidate();
+    }
+
+    class GestureListener extends GestureDetector.SimpleOnGestureListener {
+        @Override
+        public boolean onDown(MotionEvent e) {
+            return true;
+        }
+
+        @Override
+        public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+            isScrolling = true;
+
+            if (mIndicatorRect.bottom < mHeight) {
+                mIndicatorRect.set(mIndicatorRect.left, mIndicatorRect.top - distanceY, mIndicatorRect.right, mIndicatorRect.bottom - distanceY);
+            }
+
+            invalidate();
+            return true;
+        }
     }
 }
