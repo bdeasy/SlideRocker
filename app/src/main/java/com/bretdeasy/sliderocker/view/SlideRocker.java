@@ -6,6 +6,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.os.AsyncTask;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.GestureDetector;
@@ -13,6 +14,9 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import com.bretdeasy.sliderocker.R;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A SlideRocker is a graphical object that can increment or decrement at variable rates. The circular
@@ -27,6 +31,8 @@ public class SlideRocker extends View {
     private int mIndicatorColor;
     private RectF mIndicatorRect;
     private RectF mIndicatorOriginRect;
+    private RectF mIndicatorBottomRect;
+    private RectF mIndicatorTopRect;
     private RectF mTopCapRect;
     private RectF mBottomCapRect;
 
@@ -34,10 +40,20 @@ public class SlideRocker extends View {
     private int mWidth;
     private int mHeight;
     private int mCapRadius;
+    private int mIndicatorRadius;
 
     //Gesture
     private GestureDetector mDetector;
     private boolean isScrolling;
+    private Map<String, String> mActionMap;
+
+    //Listener
+    private OnIntervalTriggeredListener onIntervalTriggeredListener;
+    private IntervalCounterAsyncTask mIntervalCounterAsyncTask;
+
+    //Intervals
+    private int mIntervals = 1;
+    private int mValue = 1;
 
 
     public SlideRocker(Context context) {
@@ -75,6 +91,8 @@ public class SlideRocker extends View {
         mLinePaint.setStyle(Paint.Style.FILL);
 
         mDetector = new GestureDetector(SlideRocker.this.getContext(), new GestureListener());
+        mIntervalCounterAsyncTask = new IntervalCounterAsyncTask();
+
     }
 
     @Override
@@ -84,23 +102,24 @@ public class SlideRocker extends View {
         mWidth = w;
         mHeight = h;
 
+        mIndicatorRadius = mWidth / 2;
         int lineWidth = mWidth / 4;
         mCapRadius = lineWidth / 2;
         int centerX = mWidth / 2;
         int centerY = mHeight / 2;
-        int indicatorRadius = mWidth / 2;
+
 
         mIndicatorRect = new RectF(
-                centerX - indicatorRadius,
-                centerY - indicatorRadius,
-                centerX + indicatorRadius,
-                centerY + indicatorRadius);
+                centerX - mIndicatorRadius,
+                centerY - mIndicatorRadius,
+                centerX + mIndicatorRadius,
+                centerY + mIndicatorRadius);
 
         mIndicatorOriginRect = new RectF(
-                centerX - indicatorRadius,
-                centerY - indicatorRadius,
-                centerX + indicatorRadius,
-                centerY + indicatorRadius);
+                centerX - mIndicatorRadius,
+                centerY - mIndicatorRadius,
+                centerX + mIndicatorRadius,
+                centerY + mIndicatorRadius);
 
         mTopCapRect = new RectF(
                 centerX - mCapRadius,
@@ -112,6 +131,20 @@ public class SlideRocker extends View {
                 centerX - mCapRadius,
                 mHeight - 2 * mCapRadius,
                 centerX + mCapRadius,
+                mHeight);
+
+        //Set the rect for the top-most point and bottom-most point for the indicator
+        //noinspection SuspiciousNameCombination
+        mIndicatorTopRect = new RectF(
+                0,
+                0,
+                mWidth,
+                mWidth);
+
+        mIndicatorBottomRect = new RectF(
+                0,
+                mHeight - mWidth,
+                mWidth,
                 mHeight);
 
         mLinePaint.setStrokeWidth(2 * mCapRadius);
@@ -132,12 +165,43 @@ public class SlideRocker extends View {
         boolean result = mDetector.onTouchEvent(event);
 
         if (!result) {
-            if (event.getAction() == MotionEvent.ACTION_UP) {
+            if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
                 resetView();
             }
+
+            Log.d("onTouchEvent - False", "Action = " + getActionName(event.getAction()));
+        } else {
+            Log.d("onTouchEvent - True", "Action = " + getActionName(event.getAction()));
         }
 
         return result;
+    }
+
+    private String getActionName(int id) {
+        if (mActionMap == null) {
+            initializeActionMap();
+        }
+
+        String key = String.valueOf(id);
+
+        return mActionMap.get(key);
+    }
+
+    private void initializeActionMap() {
+        mActionMap = new HashMap<>();
+        mActionMap.put("0", "ACTION_DOWN");
+        mActionMap.put("1", "ACTION_UP");
+        mActionMap.put("2", "ACTION_MOVE");
+        mActionMap.put("3", "ACTION_CANCEL");
+        mActionMap.put("4", "ACTION_OUTSIDE");
+        mActionMap.put("5", "ACTION_POINTER_DOWN");
+        mActionMap.put("6", "ACTION_POINTER_UP");
+        mActionMap.put("7", "ACTION_HOVER_MOVE");
+        mActionMap.put("8", "ACTION_SCROLL");
+        mActionMap.put("9", "ACTION_HOVER_ENTER");
+        mActionMap.put("10", "ACTION_HOVER_EXIT");
+        mActionMap.put("11", "ACTION_BUTTON_PRESS");
+        mActionMap.put("12", "ACTION_BUTTON_RELEASE");
     }
 
     private void resetView() {
@@ -145,6 +209,14 @@ public class SlideRocker extends View {
         mIndicatorRect.set(mIndicatorOriginRect);
 
         invalidate();
+    }
+
+    public OnIntervalTriggeredListener getOnIntervalTriggeredListener() {
+        return onIntervalTriggeredListener;
+    }
+
+    public void setOnIntervalTriggeredListener(OnIntervalTriggeredListener onIntervalTriggeredListener) {
+        this.onIntervalTriggeredListener = onIntervalTriggeredListener;
     }
 
     class GestureListener extends GestureDetector.SimpleOnGestureListener {
@@ -157,12 +229,60 @@ public class SlideRocker extends View {
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
             isScrolling = true;
 
-            if (mIndicatorRect.bottom < mHeight) {
-                mIndicatorRect.set(mIndicatorRect.left, mIndicatorRect.top - distanceY, mIndicatorRect.right, mIndicatorRect.bottom - distanceY);
+            if (mIndicatorRect.bottom < mHeight && mIndicatorRect.top > 0) {
+                mIndicatorRect.set(
+                        mIndicatorRect.left,
+                        mIndicatorRect.top - distanceY,
+                        mIndicatorRect.right,
+                        mIndicatorRect.bottom - distanceY);
+            } else {
+                float pointerY = e2.getY();
+                Log.d("onScroll", "Pointer Y Position: " + pointerY + " \nHeight: " + mHeight + "\nRadius: " + mIndicatorRadius);
+                if (pointerY < mHeight - mIndicatorRadius && pointerY > mIndicatorRadius) {
+                    mIndicatorRect.set(
+                            mIndicatorRect.left,
+                            pointerY - mIndicatorRadius,
+                            mIndicatorRect.right,
+                            pointerY + mIndicatorRadius);
+                } else if (mIndicatorRect.bottom >= mHeight) {
+                    mIndicatorRect.set(mIndicatorBottomRect);
+                } else {
+                    mIndicatorRect.set(mIndicatorTopRect);
+                }
             }
+
+
 
             invalidate();
             return true;
+        }
+    }
+
+    public interface OnIntervalTriggeredListener {
+        void onIntervalTriggered(int value);
+    }
+
+    private class IntervalCounterAsyncTask extends AsyncTask<Integer, Integer, Void> {
+        @Override
+        protected Void doInBackground(Integer... params) {
+            int value = params[0];
+            int interval = params[1];
+
+            long current = System.currentTimeMillis();
+
+            while (isScrolling) {
+                if (current + interval < System.currentTimeMillis()) {
+                    current = System.currentTimeMillis();
+                    publishProgress(value);
+                }
+            }
+
+            return null;
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            onIntervalTriggeredListener.onIntervalTriggered(values[0]);
         }
     }
 }
