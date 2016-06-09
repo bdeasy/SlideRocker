@@ -11,6 +11,8 @@
     <declare-styleable name="SlideRocker">
         <attr name="indicatorColor" format="color"/>
         <attr name="lineColor" format="color"/>
+        <attr name="intervalCount" format="integer"/>
+        <attr name="intervalRate" format="integer"/>
     </declare-styleable>
 
 </resources>

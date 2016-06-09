@@ -8,14 +8,28 @@
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
+    android:layout_marginTop="?android:attr/actionBarSize"
     tools:context="com.bretdeasy.sliderocker.MainActivity">
 
+    <TextView
+        android:id="@+id/text_view_counter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="@dimen/activity_vertical_margin"
+        android:text="@string/text_counter_start_value"
+        android:textSize="@dimen/text_size_counter"/>
+
     <com.bretdeasy.sliderocker.view.SlideRocker
+        android:id="@+id/slideRocker"
         android:layout_height="@dimen/rocker_height"
         android:layout_width="@dimen/rocker_width"
+        android:layout_below="@+id/text_view_counter"
         android:layout_centerHorizontal="true"
-        android:layout_centerVertical="true"
         custom:indicatorColor="@color/colorAccent"
         custom:lineColor="@color/colorPrimary"
+        custom:intervalCount="@integer/slider_number_intervals"
+        custom:intervalRate="@integer/slider_interval_rate"
+        android:layout_marginTop="@dimen/activity_vertical_margin"
         />
 </RelativeLayout>

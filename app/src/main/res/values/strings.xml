@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SlideRocker</string>
+    <string name="text_counter_start_value">0</string>
 </resources>

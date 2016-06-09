@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer name="slider_number_intervals">10</integer>
+    <integer name="slider_interval_rate">1000</integer>
+</resources>
